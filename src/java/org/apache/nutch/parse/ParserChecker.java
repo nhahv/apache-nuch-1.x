@@ -135,9 +135,30 @@ public class ParserChecker implements Tool {
     Text turl = new Text(url);
     ProtocolOutput output = protocol.getProtocolOutput(turl, cd);
 
+    // If the configuration permits, handle redirects until we either run
+    // out of allowed redirects or we stop getting redirect statuses.
+    int maxRedirects = conf.getInt("http.redirect.max", 0);
+    int numRedirects = 0;
+    while (output.getStatus().isRedirect() && numRedirects < maxRedirects) {
+        String newURL = URLUtil.toASCII(output.getStatus().getArgs()[0]);
+        LOG.info("Handling redirect to " + newURL);
+
+        protocol = factory.getProtocol(newURL);
+        turl = new Text(newURL);
+        output = protocol.getProtocolOutput(turl, cd);
+
+        numRedirects++;
+    }
+
     if (!output.getStatus().isSuccess()) {
       System.err.println("Fetch failed with protocol status: "
           + output.getStatus());
+
+      if (output.getStatus().isRedirect()) {
+          System.err.println("Redirect(s) not handled due to configuration.");
+          System.err.println("Max Redirects to handle per config: " + maxRedirects);
+          System.err.println("Number of Redirects handled: " + numRedirects);
+      }
       return (-1);
     }
 

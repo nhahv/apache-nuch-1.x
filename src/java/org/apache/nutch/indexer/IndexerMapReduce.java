@@ -22,6 +22,8 @@ import java.util.Iterator;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.codec.binary.StringUtils;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -47,6 +49,7 @@ import org.apache.nutch.parse.Parse;
 import org.apache.nutch.parse.ParseData;
 import org.apache.nutch.parse.ParseImpl;
 import org.apache.nutch.parse.ParseText;
+import org.apache.nutch.protocol.Content;
 import org.apache.nutch.scoring.ScoringFilterException;
 import org.apache.nutch.scoring.ScoringFilters;
 
@@ -63,10 +66,12 @@ public class IndexerMapReduce extends Configured implements
   public static final String INDEXER_SKIP_NOTMODIFIED = "indexer.skip.notmodified";
   public static final String URL_FILTERING = "indexer.url.filters";
   public static final String URL_NORMALIZING = "indexer.url.normalizers";
+  public static final String INDEXER_BINARY_AS_BASE64 = "indexer.binary.base64";
 
   private boolean skip = false;
   private boolean delete = false;
   private boolean deleteRobotsNoIndex = false;
+  private boolean base64 = false;
   private IndexingFilters filters;
   private ScoringFilters scfilters;
 
@@ -78,6 +83,10 @@ public class IndexerMapReduce extends Configured implements
   private URLNormalizers urlNormalizers;
   private URLFilters urlFilters;
 
+  /** Predefined action to delete documents from the index */
+  private static final NutchIndexAction DELETE_ACTION = new NutchIndexAction(
+      null, NutchIndexAction.DELETE);
+
   public void configure(JobConf job) {
     setConf(job);
     this.filters = new IndexingFilters(getConf());
@@ -86,6 +95,7 @@ public class IndexerMapReduce extends Configured implements
     this.deleteRobotsNoIndex = job.getBoolean(INDEXER_DELETE_ROBOTS_NOINDEX,
         false);
     this.skip = job.getBoolean(INDEXER_SKIP_NOTMODIFIED, false);
+    this.base64 = job.getBoolean(INDEXER_BINARY_AS_BASE64, false);
 
     normalize = job.getBoolean(URL_NORMALIZING, false);
     filter = job.getBoolean(URL_FILTERING, false);
@@ -154,7 +164,7 @@ public class IndexerMapReduce extends Configured implements
 
   public void map(Text key, Writable value,
       OutputCollector<Text, NutchWritable> output, Reporter reporter)
-      throws IOException {
+          throws IOException {
 
     String urlString = filterUrl(normalizeUrl(key.toString()));
     if (urlString == null) {
@@ -168,10 +178,11 @@ public class IndexerMapReduce extends Configured implements
 
   public void reduce(Text key, Iterator<NutchWritable> values,
       OutputCollector<Text, NutchIndexAction> output, Reporter reporter)
-      throws IOException {
+          throws IOException {
     Inlinks inlinks = null;
     CrawlDatum dbDatum = null;
     CrawlDatum fetchDatum = null;
+    Content content = null;
     ParseData parseData = null;
     ParseText parseText = null;
 
@@ -207,14 +218,15 @@ public class IndexerMapReduce extends Configured implements
           if (robotsMeta != null
               && robotsMeta.toLowerCase().indexOf("noindex") != -1) {
             // Delete it!
-            NutchIndexAction action = new NutchIndexAction(null,
-                NutchIndexAction.DELETE);
-            output.collect(key, action);
+            output.collect(key, DELETE_ACTION);
+            reporter.incrCounter("IndexerStatus", "deleted (robots=noindex)", 1);
             return;
           }
         }
       } else if (value instanceof ParseText) {
         parseText = (ParseText) value;
+      } else if (value instanceof Content) {
+        content = (Content)value;
       } else if (LOG.isWarnEnabled()) {
         LOG.warn("Unrecognized type: " + value.getClass());
       }
@@ -224,11 +236,8 @@ public class IndexerMapReduce extends Configured implements
     if (delete && fetchDatum != null && dbDatum != null) {
       if (fetchDatum.getStatus() == CrawlDatum.STATUS_FETCH_GONE
           || dbDatum.getStatus() == CrawlDatum.STATUS_DB_GONE) {
-        reporter.incrCounter("IndexerStatus", "Documents deleted", 1);
-
-        NutchIndexAction action = new NutchIndexAction(null,
-            NutchIndexAction.DELETE);
-        output.collect(key, action);
+        reporter.incrCounter("IndexerStatus", "deleted (gone)", 1);
+        output.collect(key, DELETE_ACTION);
         return;
       }
 
@@ -236,12 +245,8 @@ public class IndexerMapReduce extends Configured implements
           || fetchDatum.getStatus() == CrawlDatum.STATUS_FETCH_REDIR_TEMP
           || dbDatum.getStatus() == CrawlDatum.STATUS_DB_REDIR_PERM
           || dbDatum.getStatus() == CrawlDatum.STATUS_DB_REDIR_TEMP) {
-        reporter.incrCounter("IndexerStatus", "Deleted redirects", 1);
-        reporter.incrCounter("IndexerStatus", "Perm redirects deleted", 1);
-
-        NutchIndexAction action = new NutchIndexAction(null,
-            NutchIndexAction.DELETE);
-        output.collect(key, action);
+        reporter.incrCounter("IndexerStatus", "deleted redirects", 1);
+        output.collect(key, DELETE_ACTION);
         return;
       }
     }
@@ -253,16 +258,14 @@ public class IndexerMapReduce extends Configured implements
 
     // Whether to delete pages marked as duplicates
     if (delete && dbDatum.getStatus() == CrawlDatum.STATUS_DB_DUPLICATE) {
-      reporter.incrCounter("IndexerStatus", "Duplicates deleted", 1);
-      NutchIndexAction action = new NutchIndexAction(null,
-          NutchIndexAction.DELETE);
-      output.collect(key, action);
+      reporter.incrCounter("IndexerStatus", "deleted duplicates", 1);
+      output.collect(key, DELETE_ACTION);
       return;
     }
 
     // Whether to skip DB_NOTMODIFIED pages
     if (skip && dbDatum.getStatus() == CrawlDatum.STATUS_DB_NOTMODIFIED) {
-      reporter.incrCounter("IndexerStatus", "Skipped", 1);
+      reporter.incrCounter("IndexerStatus", "skipped (not modified)", 1);
       return;
     }
 
@@ -305,13 +308,13 @@ public class IndexerMapReduce extends Configured implements
       if (LOG.isWarnEnabled()) {
         LOG.warn("Error indexing " + key + ": " + e);
       }
-      reporter.incrCounter("IndexerStatus", "Errors", 1);
+      reporter.incrCounter("IndexerStatus", "errors (IndexingFilter)", 1);
       return;
     }
 
     // skip documents discarded by indexing filters
     if (doc == null) {
-      reporter.incrCounter("IndexerStatus", "Skipped by filters", 1);
+      reporter.incrCounter("IndexerStatus", "skipped by indexing filters", 1);
       return;
     }
 
@@ -321,6 +324,7 @@ public class IndexerMapReduce extends Configured implements
       boost = this.scfilters.indexerScore(key, doc, dbDatum, fetchDatum, parse,
           inlinks, boost);
     } catch (final ScoringFilterException e) {
+      reporter.incrCounter("IndexerStatus", "errors (ScoringFilter)", 1);
       if (LOG.isWarnEnabled()) {
         LOG.warn("Error calculating score " + key + ": " + e);
       }
@@ -331,7 +335,19 @@ public class IndexerMapReduce extends Configured implements
     // store boost for use by explain and dedup
     doc.add("boost", Float.toString(boost));
 
-    reporter.incrCounter("IndexerStatus", "Documents added", 1);
+    if (content != null) {
+      // Get the original unencoded content
+      String binary = new String(content.getContent());
+
+      // optionally encode as base64
+      if (base64) {
+        binary = Base64.encodeBase64String(StringUtils.getBytesUtf8(binary));
+      }
+
+      doc.add("binaryContent", binary);
+    }
+
+    reporter.incrCounter("IndexerStatus", "indexed (add/update)", 1);
 
     NutchIndexAction action = new NutchIndexAction(doc, NutchIndexAction.ADD);
     output.collect(key, action);
@@ -341,7 +357,7 @@ public class IndexerMapReduce extends Configured implements
   }
 
   public static void initMRJob(Path crawlDb, Path linkDb,
-      Collection<Path> segments, JobConf job) {
+      Collection<Path> segments, JobConf job, boolean addBinaryContent) {
 
     LOG.info("IndexerMapReduce: crawldb: " + crawlDb);
 
@@ -356,12 +372,28 @@ public class IndexerMapReduce extends Configured implements
           CrawlDatum.PARSE_DIR_NAME));
       FileInputFormat.addInputPath(job, new Path(segment, ParseData.DIR_NAME));
       FileInputFormat.addInputPath(job, new Path(segment, ParseText.DIR_NAME));
+
+      if (addBinaryContent) {
+        FileInputFormat.addInputPath(job, new Path(segment, Content.DIR_NAME));
+      }
     }
 
     FileInputFormat.addInputPath(job, new Path(crawlDb, CrawlDb.CURRENT_NAME));
 
-    if (linkDb != null)
-      FileInputFormat.addInputPath(job, new Path(linkDb, LinkDb.CURRENT_NAME));
+    if (linkDb != null) {
+      Path currentLinkDb = new Path(linkDb, LinkDb.CURRENT_NAME);
+      try {
+        if (FileSystem.get(job).exists(currentLinkDb)) {
+          FileInputFormat.addInputPath(job, currentLinkDb);
+        } else {
+          LOG.warn("Ignoring linkDb for indexing, no linkDb found in path: {}",
+              linkDb);
+        }
+      } catch (IOException e) {
+        LOG.warn("Failed to use linkDb ({}) for indexing: {}", linkDb,
+            org.apache.hadoop.util.StringUtils.stringifyException(e));
+      }
+    }
 
     job.setInputFormat(SequenceFileInputFormat.class);
 

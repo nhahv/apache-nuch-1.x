@@ -33,14 +33,6 @@ import java.util.regex.Pattern;
 import java.util.TreeMap;
 
 
-
-
-
-
-
-
-
-
 // Commons Logging imports
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,8 +67,9 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.nutch.util.NutchConfiguration;
 import org.apache.nutch.util.NutchJob;
-import org.apache.nutch.util.NutchTool;
 import org.apache.nutch.util.StringUtil;
+import org.apache.commons.jexl2.Expression;
+import org.apache.commons.jexl2.JexlEngine;
 
 /**
  * Read utility for the CrawlDB.
@@ -485,7 +478,7 @@ public class CrawlDbReader extends Configured implements Closeable, Tool {
 
   public void processDumpJob(String crawlDb, String output,
       JobConf config, String format, String regex, String status,
-      Integer retry) throws IOException {
+      Integer retry, String expr) throws IOException {
     if (LOG.isInfoEnabled()) {
       LOG.info("CrawlDb dump: starting");
       LOG.info("CrawlDb db: " + crawlDb);
@@ -514,6 +507,8 @@ public class CrawlDbReader extends Configured implements Closeable, Tool {
       job.set("regex", regex);
     if (retry != null)
       job.setInt("retry", retry);
+    if (expr != null)
+      job.set("expr", expr);
 
     job.setMapperClass(CrawlDbDumpMapper.class);
     job.setOutputKeyClass(Text.class);
@@ -531,6 +526,7 @@ public class CrawlDbReader extends Configured implements Closeable, Tool {
     Matcher matcher = null;
     String status = null;
     Integer retry = null;
+    Expression expr = null;
 
     public void configure(JobConf job) {
       if (job.get("regex", null) != null) {
@@ -538,6 +534,13 @@ public class CrawlDbReader extends Configured implements Closeable, Tool {
       }
       status = job.get("status", null);
       retry = job.getInt("retry", -1);
+
+      if (job.get("expr", null) != null) {
+        JexlEngine jexl = new JexlEngine();
+        jexl.setSilent(true);
+        jexl.setStrict(true);
+        expr = jexl.createExpression(job.get("expr", null));
+      }
     }
 
     public void close() {
@@ -564,6 +567,13 @@ public class CrawlDbReader extends Configured implements Closeable, Tool {
       if (pattern != null) {
         matcher = pattern.matcher(key.toString());
         if (!matcher.matches()) {
+          return;
+        }
+      }
+      
+      // check expr
+      if (expr != null) {
+        if (!value.evaluate(expr)) {
           return;
         }
       }
@@ -650,6 +660,7 @@ public class CrawlDbReader extends Configured implements Closeable, Tool {
       System.err.println("\t\t[-retry <num>]\tminimum retry count");
       System.err
           .println("\t\t[-status <status>]\tfilter records by CrawlDatum status");
+      System.err.println("\t\t[-expr <expr>]\tJexl expression to evaluate for this record");
       System.err
           .println("\t-url <url>\tprint information on <url> to System.out");
       System.err
@@ -676,6 +687,7 @@ public class CrawlDbReader extends Configured implements Closeable, Tool {
         String regex = null;
         Integer retry = null;
         String status = null;
+        String expr = null;
         for (int j = i + 1; j < args.length; j++) {
           if (args[j].equals("-format")) {
             format = args[++j];
@@ -693,8 +705,12 @@ public class CrawlDbReader extends Configured implements Closeable, Tool {
             status = args[++j];
             i = i + 2;
           }
+          if (args[j].equals("-expr")) {
+            expr = args[++j];
+            i=i+2;
+          }
         }
-        dbr.processDumpJob(crawlDb, param, job, format, regex, status, retry);
+        dbr.processDumpJob(crawlDb, param, job, format, regex, status, retry, expr);
       } else if (args[i].equals("-url")) {
         param = args[++i];
         dbr.readUrl(crawlDb, param, job);
@@ -752,6 +768,7 @@ public class CrawlDbReader extends Configured implements Closeable, Tool {
           String[] st = k.split(" ");
           int code = Integer.parseInt(st[1]);
           if (st.length > 2){
+            @SuppressWarnings("unchecked")
             Map<String, Object> individualStatusInfo = (Map<String, Object>) statusMap.get(String.valueOf(code));
             Map<String, String> hostValues;
             if(individualStatusInfo.containsKey("hostValues")){
@@ -783,6 +800,7 @@ public class CrawlDbReader extends Configured implements Closeable, Tool {
       String regex = null;
       Integer retry = null;
       String status = null;
+      String expr = null;
       if (args.containsKey("format")) {
         format = args.get("format");
       }
@@ -795,7 +813,10 @@ public class CrawlDbReader extends Configured implements Closeable, Tool {
       if (args.containsKey("status")) {
         status = args.get("status");
       }
-      processDumpJob(crawlDb, output, new NutchJob(conf), format, regex, status, retry);
+      if (args.containsKey("expr")) {
+        expr = args.get("expr");
+      }
+      processDumpJob(crawlDb, output, new NutchJob(conf), format, regex, status, retry, expr);
       File dumpFile = new File(output+"/part-00000");
       return dumpFile;		  
     }

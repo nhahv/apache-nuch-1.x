@@ -96,7 +96,7 @@
     <javac 
      encoding="${build.encoding}" 
      srcdir="${src.dir}"
-     includes="org/apache/nutch/**/*.java"
+     includes="org/apache/nutch/**/*.java,vn/inews/nutch/**/*.java"
      destdir="${build.classes}"
      debug="${javac.debug}"
      optimize="${javac.optimize}"
