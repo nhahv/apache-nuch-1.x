@@ -87,6 +87,8 @@
   <classpathentry kind="src" path="./src/plugin/urlnormalizer-regex/src/test/" />
   <classpathentry kind="src" path="./src/plugin/urlnormalizer-slash/src/java/" />
   <classpathentry kind="src" path="./src/plugin/urlnormalizer-slash/src/test/" />
+  <classpathentry kind="src" path="./src/plugin/readabilityBUNDLE/src/main/" />
+  <classpathentry kind="src" path="./src/plugin/readabilityBUNDLE/src/test/" />
   <classpathentry kind="lib" path="conf" />
   <classpathentry kind="lib" path="src/bin" />
   <classpathentry kind="lib" path="build/lib/activation-1.1.jar" />

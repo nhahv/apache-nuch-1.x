@@ -20,7 +20,7 @@
 
     <property>
         <name>fetcher.threads.fetch</name>
-        <value>5</value>
+        <value>20</value>
         <description>The number of FetcherThreads the fetcher should use.
             This is also determines the maximum number of requests that are
             made at once (each FetcherThread handles one connection). The total
@@ -31,7 +31,7 @@
 
     <property>
         <name>fetcher.threads.per.queue</name>
-        <value>2</value>
+        <value>20</value>
         <description>This number is the maximum number of threads that
             should be allowed to access a queue at one time. Setting it to
             a value > 1 will cause the Crawl-Delay value from robots.txt to
@@ -99,7 +99,7 @@
 
     <property>
         <name>elastic.cluster</name>
-        <value>elasticsearch</value>
+        <value>estintucvnlocal_nhahv</value>
         <description>The cluster name to discover. Either host and potr must be defined
             or cluster.</description>
     </property>

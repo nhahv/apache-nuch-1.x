@@ -123,11 +123,11 @@ public class ElasticIndexWriter implements IndexWriter {
 
   @Override
   public void write(NutchDocument doc) throws IOException {
-    String id = (String) doc.getFieldValue("id");
+//    String id = (String) doc.getFieldValue("id");
     String type = doc.getDocumentMeta().get("type");
     if (type == null)
       type = "doc";
-    IndexRequestBuilder request = client.prepareIndex(defaultIndex, type, id);
+    IndexRequestBuilder request = client.prepareIndex(defaultIndex, type);
 
     Map<String, Object> source = new HashMap<String, Object>();
 
@@ -155,7 +155,7 @@ public class ElasticIndexWriter implements IndexWriter {
     if (bulkDocs >= maxBulkDocs || bulkLength >= maxBulkLength) {
       LOG.info("Processing bulk request [docs = " + bulkDocs + ", length = "
           + bulkLength + ", total docs = " + indexedDocs
-          + ", last doc in bulk = '" + id + "']");
+          + ", last doc in bulk = 'NO ID']");
       // Flush the bulk of indexing requests
       createNewBulk = true;
       commit();
