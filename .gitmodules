@@ -1,0 +1,6 @@
+[submodule "src/plugin/readabilityBUNDLE"]
+	path = src/plugin/readabilityBUNDLE
+	url = https://github.com/nhahv/readabilityBUNDLE
+[submodule "src/plugin/_"]
+	path = src/plugin/_
+	url = https://github.com/nhahv/readabilityBUNDLE

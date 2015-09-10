@@ -96,7 +96,7 @@
     <javac 
      encoding="${build.encoding}" 
      srcdir="${src.dir}"
-     includes="org/apache/nutch/**/*.java"
+     includes="org/apache/nutch/**/*.java,vn/inews/nutch/**/*.java"
      destdir="${build.classes}"
      debug="${javac.debug}"
      optimize="${javac.optimize}"
@@ -218,6 +218,8 @@
       <packageset dir="${plugins.dir}/urlnormalizer-querystring/src/java"/>
       <packageset dir="${plugins.dir}/urlnormalizer-regex/src/java"/>
       <packageset dir="${plugins.dir}/urlnormalizer-slash/src/java"/>
+      <packageset dir="${plugins.dir}/readabilityBUNDLE/src/main/"/>
+
 
       <link href="${javadoc.link.java}"/>
       <link href="${javadoc.link.lucene}"/>
@@ -628,6 +630,7 @@
       <packageset dir="${plugins.dir}/urlnormalizer-querystring/src/java"/>
       <packageset dir="${plugins.dir}/urlnormalizer-regex/src/java"/>
       <packageset dir="${plugins.dir}/urlnormalizer-slash/src/java"/>
+      <packageset dir="${plugins.dir}/readabilityBUNDLE/src/main/"/>
 
       <link href="${javadoc.link.java}"/>
       <link href="${javadoc.link.lucene}"/>
@@ -1050,6 +1053,9 @@
         <source path="${plugins.dir}/urlnormalizer-regex/src/test/" />
         <source path="${plugins.dir}/urlnormalizer-slash/src/java/" />
         <source path="${plugins.dir}/urlnormalizer-slash/src/test/" />
+
+        <source path="${plugins.dir}/readabilityBUNDLE/src/main/" />
+        <source path="${plugins.dir}/readabilityBUNDLE/src/test/" />
 
         <output path="${build.classes}" />
       </classpath>

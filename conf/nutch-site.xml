@@ -4,5 +4,122 @@
 <!-- Put site-specific property overrides in this file. -->
 
 <configuration>
+    <property>
+        <name>http.agent.name</name>
+        <value>My Nutch Spider</value>
+    </property>
+    <property>
+        <name>fetcher.server.delay</name>
+        <value>0.1</value>
+        <description>The number of seconds the fetcher will delay between
+            successive requests to the same server. Note that this might get
+            overriden by a Crawl-Delay from a robots.txt and is used ONLY if
+            fetcher.threads.per.queue is set to 1.
+        </description>
+    </property>
+
+    <property>
+        <name>fetcher.threads.fetch</name>
+        <value>20</value>
+        <description>The number of FetcherThreads the fetcher should use.
+            This is also determines the maximum number of requests that are
+            made at once (each FetcherThread handles one connection). The total
+            number of threads running in distributed mode will be the number of
+            fetcher threads * number of nodes as fetcher has one map task per node.
+        </description>
+    </property>
+
+    <property>
+        <name>fetcher.threads.per.queue</name>
+        <value>20</value>
+        <description>This number is the maximum number of threads that
+            should be allowed to access a queue at one time. Setting it to
+            a value > 1 will cause the Crawl-Delay value from robots.txt to
+            be ignored and the value of fetcher.server.min.delay to be used
+            as a delay between successive requests to the same server instead
+            of fetcher.server.delay.
+        </description>
+    </property>
+
+
+    <!-- INEWS SPIDER-->
+    <property>
+        <name>db.fetch.schedule.class</name>
+        <value>vn.inews.nutch.crawl.FixedFetchSchedule</value>
+        <description></description>
+    </property>
+    <property>
+        <name>db.fetch.schedule.fixed.steps</name>
+        <value>5m,15m,60m,3h,12h,24h,3d,30d</value>
+        <description>Minimum fetchInterval, in seconds.</description>
+    </property>
+
+
+    <property>
+        <name>db.ignore.external.links</name>
+        <value>true</value>
+        <description>If true, outlinks leading from a page to external hosts
+            will be ignored. This is an effective way to limit the crawl to include
+            only initially injected hosts, without creating complex URLFilters.
+        </description>
+    </property>
+
+
+
+    <property>
+        <name>plugin.includes</name>
+        <value>protocol-http|urlfilter-regex|parse-(html|tika)|index-(basic|anchor)|indexer-elastic|scoring-opic|urlnormalizer-(pass|regex|basic)</value>
+        <description>Regular expression naming plugin directory names to
+            include.  Any plugin not matching this expression is excluded.
+            In any case you need at least include the nutch-extensionpoints plugin. By
+            default Nutch includes crawling just HTML and plain text via HTTP,
+            and basic indexing and search plugins. In order to use HTTPS please enable
+            protocol-httpclient, but be aware of possible intermittent problems with the
+            underlying commons-httpclient library.
+        </description>
+    </property>
+
+
+
+    <!-- Elasticsearch properties -->
+
+    <property>
+        <name>elastic.host</name>
+        <value>localhost</value>
+        <description>The hostname to send documents to using TransportClient. Either host
+            and port must be defined or cluster.</description>
+    </property>
+
+    <property>
+        <name>elastic.port</name>
+        <value>9300</value>
+        <description>
+        </description>
+    </property>
+
+    <property>
+        <name>elastic.cluster</name>
+        <value>estintucvnlocal_nhahv</value>
+        <description>The cluster name to discover. Either host and potr must be defined
+            or cluster.</description>
+    </property>
+
+    <property>
+        <name>elastic.index</name>
+        <value>nutch110</value>
+        <description>Default index to send documents to.</description>
+    </property>
+
+    <property>
+        <name>elastic.max.bulk.docs</name>
+        <value>250</value>
+        <description>Maximum size of the bulk in number of documents.</description>
+    </property>
+
+    <property>
+        <name>elastic.max.bulk.size</name>
+        <value>2500500</value>
+        <description>Maximum size of the bulk in bytes.</description>
+    </property>
 
 </configuration>

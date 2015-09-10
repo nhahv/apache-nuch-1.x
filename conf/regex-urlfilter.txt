@@ -37,3 +37,6 @@
 
 # accept anything else
 +.
+
+#+^http://([a-z0-9]*\.)*tintuc.vn/
+
